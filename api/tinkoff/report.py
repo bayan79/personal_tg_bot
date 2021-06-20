@@ -29,4 +29,4 @@ class StocksReport:
         return fmt.text(*[
             fmt.text(AccountStocksReport(account=acc).render())
             for acc in self.user.accounts
-        ], sep='\n')
+        ], sep='\n\n')

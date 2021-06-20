@@ -4,7 +4,7 @@ from cachetools import cached, TTLCache
 from api.tinkoff.datamodels import Stocks, User, OrderBook, Price, Balance, TinkoffResponse
 from application.abstract.api import API
 from application.dataclasses.urls import URL
-from application.keys.bearer import Bearer
+from application.keys import Bearer
 
 
 class Tinkoff(API):

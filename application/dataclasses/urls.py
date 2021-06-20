@@ -7,15 +7,47 @@ import pydantic
 import requests
 from pydantic import BaseModel
 
+from application.errors import ErrorFactory
+
+
+class ErrorResponse(BaseModel):
+    __error_factory__: Type[ErrorFactory] = ErrorFactory
+
+    code: str
+    message: str
+
+    @property
+    def exception(self):
+        return self.__error_factory__.get_error(code=self.code, message=self.message)
+
 
 class ResponseDataclass(BaseModel):
+    __error_response__: Type[ErrorResponse] = ErrorResponse
+
     def items(self):
         return self
+
+    @classmethod
+    def extract_error(cls, response: requests.Response) -> BaseException:
+        try:
+            return cls.__error_response__.parse_obj(response.json()).exception
+        except:
+            return cls.__error_response__.__error_factory__.get_error(
+                code=response.status_code,
+                message=response.text
+            )
 
 
 class Method(enum.Enum):
     GET = enum.auto()
     POST = enum.auto()
+
+    @property
+    def request(self):
+        return {
+            Method.GET: requests.get,
+            Method.POST: requests.post,
+        }.get(self)
 
 
 @dataclass
@@ -32,23 +64,28 @@ class URL:
                 endpoint: str,
                 parse: Type[ResponseDataclass] = None,
                 **kwargs) -> Union[requests.Response, ResponseDataclass]:
-        method_func = {
-            Method.GET: requests.get,
-            Method.POST: requests.post,
-        }[method]
-        result = method_func(self.base + endpoint, **kwargs)
-
+        result = method.request(self.base + endpoint, **kwargs)
         if result.status_code != 200:
-            self.__logger.error(f"Error {result.status_code}: {result.content}")
-            raise requests.exceptions.RequestException(result.status_code)
+            raise self.get_error(result, response_model=parse)
 
         if parse:
             try:
                 return parse.parse_obj(result.json()).items()
             except pydantic.error_wrappers.ValidationError as e:
-                self.__logger.error(e.args)
                 raise
+            except Exception as e:
+                raise self.get_error(result, response_model=parse)
         return result
+
+    def get_error(self,
+                  response: requests.Response,
+                  response_model: Type[ResponseDataclass] = None):
+        self.__logger.error(f"Error {response.status_code}: {response.content[:100]}")
+
+        if not response_model:
+            return ErrorFactory.get_error(response.status_code, response.text)
+        error = response_model.extract_error(response)
+        return error
 
 
 if __name__ == '__main__':
@@ -65,6 +102,6 @@ if __name__ == '__main__':
         ordinalDate: str
         serviceResponse: Any
 
-    BASE_URL = URL('http://worldclockapi.com/api/')
+    BASE_URL = URL('https://worldclockapi.com/api/')
     resp = BASE_URL.request(Method.GET, endpoint='json/utc/now', parse=WorldClockAPIResponse)
     print(resp)

@@ -4,7 +4,8 @@ from typing import List, TypeVar, Generic
 from pydantic import BaseModel
 from pydantic.generics import GenericModel
 
-from application.dataclasses.urls import ResponseDataclass
+from api.tinkoff.errors import TinkoffErrorFactory
+from application.dataclasses.urls import ResponseDataclass, ErrorResponse
 from application.enums.currency import Currency
 from api.jsdelivr.methods import JSDelivr
 
@@ -114,7 +115,13 @@ class User(BaseModel):
 
 # ========= Responses =========
 
+class TinkoffErrorResponse(ErrorResponse):
+    __error_factory__ = TinkoffErrorFactory
+
+
 class TinkoffResponse(ResponseDataclass, GenericModel, Generic[TinkoffResponseType]):
+    __error_response__ = TinkoffErrorResponse
+
     payload: TinkoffResponseType
 
     def items(self) -> TinkoffResponseType:

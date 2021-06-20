@@ -1,5 +1,8 @@
 import logging
-from typing import Type
+from typing import Type, Union
+
+import requests
+from pydantic import BaseModel
 
 from application.dataclasses.urls import ResponseDataclass, URL, Method
 from application.keys.base import Key
